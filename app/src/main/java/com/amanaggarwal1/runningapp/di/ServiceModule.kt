@@ -47,7 +47,7 @@ object ServiceModule {
             .setAutoCancel(false)
             .setOngoing(true)
             .setSmallIcon(R.drawable.ic_directions_run_black_24dp)
-            .setContentTitle(R.string.app_name.toString())
+            .setContentTitle("Ongoing run")
             .setContentText("00:00:00")
             .setContentIntent(pendingIntent)
 }
