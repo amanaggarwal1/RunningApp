@@ -1,7 +1,6 @@
 package com.amanaggarwal1.runningapp.ui.fragments
 
 import android.Manifest
-import android.icu.util.VersionInfo
 import android.os.Build
 import android.os.Bundle
 import android.view.View
@@ -13,7 +12,6 @@ import com.amanaggarwal1.runningapp.other.Constants.REQUEST_CODE_LOCATION_PERMIS
 import com.amanaggarwal1.runningapp.other.TrackingUtility
 import com.amanaggarwal1.runningapp.ui.viewmodels.MainViewModel
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.android.synthetic.main.fragment_run.*
 import pub.devrel.easypermissions.AppSettingsDialog
 import pub.devrel.easypermissions.EasyPermissions
@@ -34,7 +32,7 @@ class RunFragment: Fragment(R.layout.fragment_run), EasyPermissions.PermissionCa
     }
 
     fun requestPermissions(){
-        if(TrackingUtility.haaLocationPermission(requireContext())){
+        if(TrackingUtility.hasLocationPermission(requireContext())){
             return
         }
         if(Build.VERSION.SDK_INT < Build.VERSION_CODES.Q){
