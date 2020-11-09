@@ -29,5 +29,9 @@ object AppModule {
     @Provides
     fun provideRunDao(db: RunningDatabase) = db.getRunDao()
 
+    @Singleton
+    @Provides
+    fun provideSharedPreferences(@ApplicationContext app: Context) =
+            app.getSharedPreferences()
 
 }
