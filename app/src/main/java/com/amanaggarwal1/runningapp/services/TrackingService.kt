@@ -41,7 +41,7 @@ typealias PolyLines = MutableList<Polyline>
 
 class TrackingService : LifecycleService() {
 
-    var hasRunStarted = false
+    var isFirstRun = true
     lateinit var fusedLocationProviderClient: FusedLocationProviderClient
     companion object{
         val isTracking = MutableLiveData<Boolean>()
@@ -67,15 +67,17 @@ class TrackingService : LifecycleService() {
         intent?.let {
             when(it.action) {
                 ACTION_START_OR_RESUME_SERVICE -> {
-                    if(!hasRunStarted){
+                    if(isFirstRun){
                         startForegroundService()
-                        hasRunStarted = true
+                        isFirstRun = false
                     }else {
                         Timber.d("Resuming service")
+                        startForegroundService()
                     }
                 }
                 ACTION_PAUSE_SERVICE -> {
                     Timber.d("Paused service")
+                    pauseService()
                 }
                 ACTION_STOP_SERVICE -> {
                     Timber.d("Stopped service")
@@ -83,6 +85,10 @@ class TrackingService : LifecycleService() {
             }
         }
         return super.onStartCommand(intent, flags, startId)
+    }
+
+    private fun pauseService(){
+        isTracking.postValue(false)
     }
 
     @SuppressLint("MissingPermission")
