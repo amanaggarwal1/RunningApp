@@ -2,13 +2,15 @@ package com.amanaggarwal1.runningapp.ui.fragments
 
 import android.content.Intent
 import android.os.Bundle
-import android.view.View
+import android.view.*
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Observer
+import androidx.navigation.fragment.findNavController
 import com.amanaggarwal1.runningapp.R
 import com.amanaggarwal1.runningapp.other.Constants.ACTION_PAUSE_SERVICE
 import com.amanaggarwal1.runningapp.other.Constants.ACTION_START_OR_RESUME_SERVICE
+import com.amanaggarwal1.runningapp.other.Constants.ACTION_STOP_SERVICE
 import com.amanaggarwal1.runningapp.other.Constants.MAP_CAMERA_ZOOM
 import com.amanaggarwal1.runningapp.other.Constants.POLYLINE_COLOR
 import com.amanaggarwal1.runningapp.other.Constants.POLYLINE_WIDTH
@@ -19,12 +21,12 @@ import com.amanaggarwal1.runningapp.ui.viewmodels.MainViewModel
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.model.PolylineOptions
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.android.synthetic.main.fragment_tracking.*
-import timber.log.Timber
 
 @AndroidEntryPoint
-class TrackingFragment : Fragment(R.layout.fragment_tracking) {
+class TrackingFragment : Fragment(R.layout.fragment_tracking){
 
     private val viewModel: MainViewModel by viewModels()
 
@@ -33,13 +35,24 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking) {
 
     private var map: GoogleMap? = null
 
-    private var currentTimeMillis = 0L
+    private var curTimeInMillis = 0L
+
+    private var menu: Menu? = null
+
+    override fun onCreateView(
+            inflater: LayoutInflater,
+            container: ViewGroup?,
+            savedInstanceState: Bundle?
+    ): View? {
+        setHasOptionsMenu(true)
+        return super.onCreateView(inflater, container, savedInstanceState)
+    }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         mapView.onCreate(savedInstanceState)
         btnToggleRun.setOnClickListener {
-           toggleRun()
+            toggleRun()
         }
         mapView.getMapAsync {
             map = it
@@ -49,46 +62,89 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking) {
         subscribeToObservers()
     }
 
-    private fun subscribeToObservers(){
+    private fun subscribeToObservers() {
         TrackingService.isTracking.observe(viewLifecycleOwner, Observer {
             updateTracking(it)
         })
 
         TrackingService.pathPoints.observe(viewLifecycleOwner, Observer {
             pathPoints = it
-            addLatestPolyLine()
+            addLatestPolyline()
             moveCameraToUser()
         })
 
         TrackingService.timeRunInMillis.observe(viewLifecycleOwner, Observer {
-            currentTimeMillis = it
-            val formattedTime = TrackingUtility.getFormattedStopWatchTime(currentTimeMillis)
+            curTimeInMillis = it
+            val formattedTime = TrackingUtility.getFormattedStopWatchTime(curTimeInMillis)
             tvTimer.text = formattedTime
         })
     }
 
-    private fun toggleRun(){
-        if(isTracking){
+    private fun toggleRun() {
+        if(isTracking) {
+            menu?.getItem(0)?.isVisible = true
             sendCommandToService(ACTION_PAUSE_SERVICE)
-        }else{
+        } else {
             sendCommandToService(ACTION_START_OR_RESUME_SERVICE)
         }
     }
 
+    override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
+        super.onCreateOptionsMenu(menu, inflater)
+        inflater.inflate(R.menu.toolbar_tracking_menu, menu)
+        this.menu = menu
+    }
 
-    private fun updateTracking(isTracking : Boolean){
+    override fun onPrepareOptionsMenu(menu: Menu) {
+        super.onPrepareOptionsMenu(menu)
+        if(curTimeInMillis > 0L) {
+            this.menu?.getItem(0)?.isVisible = true
+        }
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        when(item.itemId) {
+            R.id.miCancelTracking -> {
+                showCancelTrackingDialog()
+            }
+        }
+        return super.onOptionsItemSelected(item)
+    }
+
+    private fun showCancelTrackingDialog() {
+        val dialog = MaterialAlertDialogBuilder(requireContext(), R.style.AlertDialogTheme)
+                .setTitle("Cancel the Run?")
+                .setMessage("Are you sure to cancel the current run and delete all its data?")
+                .setIcon(R.drawable.ic_delete)
+                .setPositiveButton("Yes") { _, _ ->
+                    stopRun()
+                }
+                .setNegativeButton("No") { dialogInterface, _ ->
+                    dialogInterface.cancel()
+                }
+                .create()
+        dialog.show()
+    }
+
+    private fun stopRun() {
+        sendCommandToService(ACTION_STOP_SERVICE)
+        findNavController().navigate(R.id.action_trackingFragment_to_runFragment)
+    }
+
+    private fun updateTracking(isTracking: Boolean) {
         this.isTracking = isTracking
-        if(!isTracking){
+        if(!isTracking) {
             btnToggleRun.text = "Start"
             btnFinishRun.visibility = View.VISIBLE
-        }else{
+        } else {
             btnToggleRun.text = "Stop"
+            menu?.getItem(0)?.isVisible = true
             btnFinishRun.visibility = View.GONE
         }
     }
 
-    private fun moveCameraToUser(){
-        if(pathPoints.isNotEmpty() && pathPoints.last().isNotEmpty()){
+    private fun moveCameraToUser() {
+        if(pathPoints.isNotEmpty() && pathPoints.last().isNotEmpty()) {
             map?.animateCamera(
                     CameraUpdateFactory.newLatLngZoom(
                             pathPoints.last().last(),
@@ -98,9 +154,8 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking) {
         }
     }
 
-
-    private fun addAllPolylines(){
-        for(polyline in pathPoints){
+    private fun addAllPolylines() {
+        for(polyline in pathPoints) {
             val polylineOptions = PolylineOptions()
                     .color(POLYLINE_COLOR)
                     .width(POLYLINE_WIDTH)
@@ -109,18 +164,15 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking) {
         }
     }
 
-    private fun addLatestPolyLine(){
-        if(pathPoints.isNotEmpty() && pathPoints.last().size > 1){
-
+    private fun addLatestPolyline() {
+        if(pathPoints.isNotEmpty() && pathPoints.last().size > 1) {
             val preLastLatLng = pathPoints.last()[pathPoints.last().size - 2]
             val lastLatLng = pathPoints.last().last()
-
             val polylineOptions = PolylineOptions()
                     .color(POLYLINE_COLOR)
                     .width(POLYLINE_WIDTH)
                     .add(preLastLatLng)
                     .add(lastLatLng)
-
             map?.addPolyline(polylineOptions)
         }
     }
@@ -131,24 +183,14 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking) {
                 requireContext().startService(it)
             }
 
-    override fun onStart() {
-        super.onStart()
-        mapView?.onStart()
-    }
-
     override fun onResume() {
         super.onResume()
         mapView?.onResume()
     }
 
-    override fun onLowMemory() {
-        super.onLowMemory()
-        mapView?.onLowMemory()
-    }
-
-    override fun onPause() {
-        super.onPause()
-        mapView?.onPause()
+    override fun onStart() {
+        super.onStart()
+        mapView?.onStart()
     }
 
     override fun onStop() {
@@ -156,9 +198,14 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking) {
         mapView?.onStop()
     }
 
-    override fun onDestroyView() {
-        super.onDestroyView()
-        mapView?.onDestroy()
+    override fun onPause() {
+        super.onPause()
+        mapView?.onPause()
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        mapView?.onLowMemory()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
